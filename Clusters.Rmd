@@ -1,0 +1,388 @@
+---
+title: "Clustering"
+author: "Joyeeta Dey"
+date: "22/11/2021"
+output: html_document
+---
+
+## installing packages
+```{r}
+library("viridisLite")
+library("GGally")
+library("tidyverse")
+library("dplyr")
+library("RColorBrewer")
+library("timeDate")
+library("leaflet")
+library("timeDate")
+library("solrad")
+library("RColorBrewer")
+library("lattice")
+library("ggcorrplot")
+```
+
+### reading datasets
+```{r}
+segment_geo_df <- read.table("C:/Users/Joyeeta/Desktop/sem 5/DA project/Datasets/segments_geometry.csv",header=TRUE,sep=",")
+
+roads <- read.table("C:/Users/Joyeeta/Desktop/sem 5/DA project/Datasets/segment.csv",header=TRUE,sep=",")
+
+acdnt <- read.table("C:/Users/Joyeeta/Desktop/sem 5/DA project/Datasets/accidents2.csv",header=TRUE,sep=",")
+
+```
+
+## Color Palette
+```{r}
+pal <- brewer.pal(n = 8, name = "Set2")
+pal
+```
+
+
+## Finding appropriate number of clusters for this dataset
+```{r}
+library(factoextra)
+library(NbClust)
+
+head(acdnt,5)
+
+scaled_data <- acdnt[,c(4,5,14,15)]
+```
+
+
+## using elbow method
+```{r}
+fviz_nbclust(scaled_data, kmeans, method = "wss") +
+  geom_vline(xintercept = 2, linetype = 2)+
+  labs(subtitle = "Elbow method")
+```
+
+
+### Silhouette method
+```{r}
+
+fviz_nbclust(scaled_data, kmeans, method = "silhouette")+
+  labs(subtitle = "Silhouette method")
+```
+
+# Clustering for k = 2,3,5,7
+```{r}
+k2 <- kmeans(scaled_data, centers = 2, nstart = 25)
+k3 <- kmeans(scaled_data, centers = 3, nstart = 25)
+k4 <- kmeans(scaled_data, centers = 4, nstart = 25)
+k5 <- kmeans(scaled_data, centers = 5, nstart = 25)
+
+pal <- brewer.pal(n = 8, name = "Set2")
+pal
+
+# plots to compare
+p1 <- fviz_cluster(k2, geom = "point", data = scaled_data) + ggtitle("k = 2")+scale_fill_manual(values = pal)+scale_color_manual(values=pal)  
+p2 <- fviz_cluster(k3, geom = "point",  data = scaled_data) + ggtitle("k = 3")+scale_fill_manual(values = pal)+scale_color_manual(values=pal)  
+p3 <- fviz_cluster(k4, geom = "point",  data = scaled_data) + ggtitle("k = 4")+scale_fill_manual(values = pal)+scale_color_manual(values=pal)  
+p4 <- fviz_cluster(k5, geom = "point",  data = scaled_data) + ggtitle("k = 5")+scale_fill_manual(values = pal)+scale_color_manual(values=pal)
+
+
+library(gridExtra)
+grid.arrange(p1, p2, p3, p4, nrow = 2)
+
+```
+## analysis
+```{r}
+
+## for k2
+k2$totss
+k2$withinss
+k2$tot.withinss
+```
+
+
+## for k3
+```{r}
+k3$totss
+k3$withinss
+k3$tot.withinss
+```
+
+## for k4
+```{r}
+k4$totss
+k4$withinss
+k4$tot.withinss
+```
+
+## for k5
+```{r}
+k5$totss
+k5$withinss
+k5$tot.withinss
+```
+
+
+
+# Cluster analysis
+```{r}
+set.seed(20)
+clusters <- kmeans(scaled_data, 5)
+
+cluster_table <- table(clusters$cluster)
+cluster_table
+
+df <- acdnt[,-c(1,2,3)]
+cluster_df <- aggregate(df, by=list(cluster=clusters$cluster), mean)
+cluster_df
+
+
+dd <- cbind(df, cluster=clusters$cluster)
+head(dd)
+
+head(clusters$cluster, 4)
+
+clusters$size
+
+center <- as.data.frame(clusters$centers)
+center
+
+```
+
+
+## visualization of variables dependency on cluster
+```{r}
+plt1 <- ggplot(dd, aes(x = latitude	, y = longitude, color=as.factor(cluster), shape=as.factor(cluster))) +
+  geom_point() + 
+  scale_color_manual(values=pal)+
+  theme(legend.position="top")
+
+plt2 <- ggplot(dd, aes(x = distance_from_centre, y = longitude, color=as.factor(cluster), shape=as.factor(cluster))) +
+  geom_point() + 
+  scale_color_manual(values=pal)+
+  theme(legend.position="top")
+
+
+
+plt3 <- ggplot(dd, aes(x = distance_from_centre, y = latitude, color=as.factor(cluster), shape=as.factor(cluster))) +
+  geom_point() + 
+  scale_color_manual(values=pal)+
+  theme(legend.position="top")
+
+
+plt4 <- ggplot(dd, aes(x = distance_from_centre, y = elevation, color=as.factor(cluster), shape=as.factor(cluster))) +
+  geom_point() + 
+  scale_color_manual(values=pal)+
+  theme(legend.position="top")
+
+
+grid.arrange(plt1, plt2, plt3, plt4, nrow = 2)
+```
+
+## dependency of other factors on the clusters
+```{r}
+## dependency of cluster on week day
+ggplot(dd, aes(x = wday)) +geom_bar(fill="#A6D854") +
+  theme(legend.position="top")+facet_wrap(dd$cluster)
+
+## dependency of cluster on month
+ggplot(dd, aes(x = month)) +geom_bar(fill="#FC8D62") +
+  theme(legend.position="top")+facet_wrap(dd$cluster)
+
+
+## dependency of cluster on hour
+ggplot(dd, aes(x = hour)) +geom_bar(fill="#66C2A5") +
+  theme(legend.position="top")+facet_wrap(dd$cluster)
+
+
+## dependency of cluster on latitude and longitude
+ggplot(dd, aes(x = latitude,y=longitude, color=as.factor(cluster))) +geom_point() + 
+  scale_color_manual(values=pal)+
+  theme(legend.position="top")+facet_wrap(dd$cluster)
+
+
+## dependency of cluster on latitude and longitude
+ggplot(dd, aes(x = elevation)) +geom_histogram(fill="#E78AC3")+theme(legend.position="top")+facet_wrap(dd$cluster)
+
+```  
+
+
+## plotting the locations of ambulances
+```{r}
+library(patchwork)
+
+## locations of ambulances 
+
+ggplot() +
+  geom_point(data = dd, mapping = aes(x = latitude	, y = longitude, color=as.factor(cluster), shape=as.factor(cluster))) + 
+  geom_point(data = center, mapping = aes(x = latitude	, y = longitude))+
+  scale_color_manual(values=pal)+
+  theme(legend.position="top")
+
+```
+
+
+## plotting the locations of ambulances
+```{r}
+library(patchwork)
+
+## locations of ambulances 
+pal <- brewer.pal(n = 4, name = "Spectral")
+pal
+
+ggcorrplot(cor(dd), type = "upper",
+     outline.col = "white", method = "circle",color=pal)
+
+correlation <- cor(dd)
+correlation
+
+```
+
+
+## model 2 for clustering
+```{r}
+
+# based on the visualizations and data analytics the variables selected are
+
+head(acdnt,3)
+
+data <- acdnt[-c(1,2,3,6,7,9,11,12,13,15,16)]
+head(data)
+
+set.seed(120)
+
+k2 <- kmeans(data, centers = 2, nstart = 25)
+k3 <- kmeans(data, centers = 3, nstart = 25)
+k4 <- kmeans(data, centers = 4, nstart = 25)
+k5 <- kmeans(data, centers = 5, nstart = 25)
+
+pal <- brewer.pal(n = 8, name = "Set2")
+pal
+
+# plots to compare
+p1 <- fviz_cluster(k2, geom = "point", data = data) + ggtitle("k = 2")+scale_fill_manual(values = pal)+scale_color_manual(values=pal)  
+p2 <- fviz_cluster(k3, geom = "point",  data = data) + ggtitle("k = 3")+scale_fill_manual(values = pal)+scale_color_manual(values=pal)  
+p3 <- fviz_cluster(k4, geom = "point",  data = data) + ggtitle("k = 4")+scale_fill_manual(values = pal)+scale_color_manual(values=pal)  
+p4 <- fviz_cluster(k5, geom = "point",  data = data) + ggtitle("k = 5")+scale_fill_manual(values = pal)+scale_color_manual(values=pal)  
+
+library(gridExtra)
+grid.arrange(p1, p2, p3, p4, nrow = 2)
+
+
+
+clusters <- kmeans(data, 5)
+
+cluster_table <- table(clusters$cluster)
+cluster_table
+
+
+str(clusters)
+
+# coordinates
+clusters$centers
+
+# measures
+clusters$totss
+clusters$withinss
+clusters$betweenss
+
+
+```
+# Determining optimal clusters
+
+
+## Elbow method
+```{r}
+library(tidyverse)  # data manipulation
+library(cluster)    # clustering algorithms
+library(factoextra) # clustering algorithms & visualization
+
+
+set.seed(123)
+
+fviz_nbclust(data, kmeans, method = "wss")
+```
+
+## Silhouette method
+```{r}
+
+fviz_nbclust(data, kmeans, method = "silhouette")
+```
+
+## final cluster
+```{r}
+set.seed(123)
+final <- kmeans(data, 5, nstart = 25)
+print(final)
+
+
+final$totss
+final$withinss
+final$tot.withinss
+final$size
+
+
+fviz_cluster(final, data = data)+ ggtitle("k = 4")+scale_fill_manual(values = pal)+scale_color_manual(values=pal)
+
+amb_pts <- data %>%
+  mutate(cluster = final$cluster) 
+
+head(amb_pts,3)
+
+
+amb_loc <- as.data.frame(final$centers)
+amb_loc
+
+
+centers <- kmeans.result$centers[kmeans.result$cluster, ] # "centers" is a data frame of 3 centers but the length of iris dataset so we can canlculate distance difference easily.
+
+distances <- sqrt(rowSums((iris2 - centers)^2))
+
+outliers <- order(distances, decreasing=T)[1:5]
+
+print(outliers) 
+```
+
+
+```{r}
+
+#plotting the points
+
+ggplot() +
+  geom_point(data = amb_pts, mapping = aes(x = latitude	, y = longitude, color=as.factor(cluster), shape=as.factor(cluster))) + 
+  geom_point(data = amb_loc, mapping = aes(x = latitude	, y = longitude))+
+  scale_color_manual(values=pal)+
+  theme(legend.position="top")
+
+```
+
+
+## map for k=5 for model1
+```{r}
+library(leaflet)
+library(leaflet.extras)
+library(magrittr)
+library(leaflet)
+library(maps)
+
+
+col <- colorFactor(c("#66C2A5", "#FC8D62", "#8DA0CB", "#E78AC3" ,"#A6D854", "#FFD92F"), domain = c(1,2,3,4,5))
+
+leaflet(dd) %>% addTiles() %>%
+  addCircleMarkers(
+    color = ~col(cluster),
+    radius=5,
+    stroke = FALSE, fillOpacity = 0.5
+  )
+```
+
+## map for k=4 for model2
+```{r}
+
+col <- colorFactor(c("#66C2A5", "#FC8D62", "#8DA0CB", "#E78AC3" ,"#A6D854", "#FFD92F"), domain = c(1,2,3,4,5))
+
+leaflet(amb_pts) %>% addTiles() %>%
+  addCircleMarkers(
+    color = ~col(cluster),
+    radius=5,
+    stroke = FALSE, fillOpacity = 0.5
+  )
+```
+
+
+
+```

@@ -1,0 +1,228 @@
+---
+title: "Road Segments"
+author: "Joyeeta Dey"
+date: "22/11/2021"
+output: html_document
+---
+
+## installing packages
+```{r}
+library("rsample")
+library("recipes")
+library("viridisLite")
+library("GGally")
+library("tidyverse")
+library("dplyr")
+library("RColorBrewer")
+library("timeDate")
+library("leaflet")
+library("timeDate")
+library("solrad")
+library("RColorBrewer")
+library("lattice")
+library("ggcorrplot")
+```
+
+### reading datasets
+```{r}
+segment_geo_df <- read.table("C:/Users/Joyeeta/Desktop/sem 5/DA project/segments_geometry.csv",header=TRUE,sep=",")
+
+roads <- read.table("C:/Users/Joyeeta/Desktop/sem 5/DA project/segment.csv",header=TRUE,sep=",")
+```
+
+# Accidents Dataset
+### Data Information
+```{r}
+dim(roads)
+head(roads,5)
+```
+
+### Data Cleaning of Road Segment Data
+```{r}
+segment <- roads %>%
+  dplyr::select(segment_id,side)
+head(subset,3)
+
+sum(is.na(segment))
+
+## sides of road segments
+side <- table(segment$side)
+side
+
+head(df)
+```
+
+### Data cleaning of segment geodata
+```{r}
+
+## checking type of road
+type <- table(segment_geo_df$type)
+type
+
+## checking geometry type of road
+geometry_type <- table(segment_geo_df$geometry.type)
+geometry_type
+
+## selecting the segment id and side
+segment <- segment %>%
+  dplyr::select(segment_id,side)
+head(segment,3)
+
+## counting the frequencies of accidents in each road
+road_name <- table(segment_geo_df$properties.road_name)
+head(road_name)
+
+str(road_name)
+road <- as.data.frame(road_name)
+
+head(road)
+
+## selecting accident frequency greater than 5
+finalroad <- road %>%
+  filter(Freq>10)
+head(finalroad)
+
+## merging the road segments with road segments geo data
+segment_geo_df <- segment_geo_df %>%
+  rename(Var1 = properties.road_name)
+df = merge(x = finalroad, y = segment_geo_df, by = "Var1")
+head(df)
+
+df <- df[,c(1,2,4)]
+head(df,3)
+
+head(df)
+
+df <- df %>%
+  rename(segment_id = properties.segment_id)
+
+## merging the final df
+final_df = merge(x = df, y = segment, by = "segment_id")
+head(final_df)
+
+dim(final_df)
+
+write.csv(final_df,"final_df.csv")
+```
+
+## Color Palette
+```{r}
+pal <- brewer.pal(n = 8, name = "YlGn")
+pal
+```
+
+
+## Basic Statistics
+```{r}
+## count of lanes
+lanes <- table(final_df$side)
+lanes
+
+lane_factor <- factor(final_df$side)
+lane_factor
+
+ggplot(final_df,aes(x=side,fill=lane_factor))+geom_bar()+scale_fill_manual(values = c('#41AB5D','#005A32'))
+
+ggplot(final_df,aes(x=Freq,fill=lane_factor))+geom_bar()+scale_fill_manual(values = c('#D9F0A3','#41AB5D'))
+
+# Plot
+g <- ggplot(final_df, aes(Var1, Freq))
+g + geom_bar(stat="identity", width = 0.5, fill="#41AB5D") + 
+      labs(title="Bar Chart", 
+           subtitle="Road names", 
+           caption="Source: Frequency of Accidents") +
+      theme(axis.text.x = element_text(angle=80, vjust=0.6))
+
+freq_df <- final_df %>%
+  group_by(Freq) %>%
+  arrange(desc(Freq))
+
+head(freq_df,1)
+```
+```{r}
+## relative frequency
+sample_size=nrow(final_df)
+old=options(digits=2) #two decimal places
+rel_freq=lanes/sample_size
+rel_freq
+
+road_factor <- factor(final_df$Road_Name)
+
+
+## finding the road with maximum frequency of accidents
+freq_table <- table(final_df$Freq)
+freq_table
+
+which.max(freq_table)
+```
+
+```{r}
+library(leaflet)
+library(leaflet.extras)
+library(magrittr)
+library(leaflet)
+library(maps)
+
+final_df <- read.csv("C:/Users/Joyeeta/Desktop/sem 5/DA project/final_df.csv")
+head(final_df,3)
+
+
+road_df <- read.csv("C:/Users/Joyeeta/Desktop/sem 5/DA project/road_segment_with_accidents.csv")
+head(road_df,3)
+```
+
+## Visualizing the roads where accidents have occured
+
+```{r}
+citycentre <- leaflet() %>%
+  addTiles() %>%  # use the default base map which is OpenStreetMap tiles
+  addMarkers(lng=36.817223, lat=-1.286389,
+             popup="City centre")
+citycentre
+
+accd_location <- leaflet(road_df) %>%
+  addTiles() %>%
+  addCircleMarkers(lng = ~longitude,
+                   lat = ~latitude,
+                   radius = 5,
+                   color=pal)
+
+accd_location
+
+```
+
+
+## Visualizing roads based on the frequency of accidents
+```{r}
+
+my_final <- merge(x = final_df, y = road_df, by = "segment_id")
+dim(my_final)
+
+df_map <- my_final[,c(1,3,4,9,10)]
+head(df_map,3)
+
+# define center of map
+lat_center <- mean(df_map$latitude)
+long_center <- mean(df_map$longitude)
+
+lat_center
+long_center
+
+viz_map <- df_map %>%
+  leaflet() %>% 
+  addTiles() %>% 
+  addProviderTiles(providers$OpenStreetMap.DE) %>% 
+  setView(long_center,lat_center,10) %>%
+  addHeatmap(lng=~longitude,lat=~latitude,intensity=~Freq,max=100,radius=6,blur=10)
+
+viz_map
+
+```
+
+## Inferences
+
+* Most accidents occur in roads which have only one lane
+* The frequency of accidents is mostly around 20-25
+* Frequency of accidents is slightly higher in roads with 1 lanes than in 2 lanes
+* maximum number of accidents occur in 'waiyaki way-trunk' road which has only one lane
+
